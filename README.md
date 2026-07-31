@@ -187,4 +187,4 @@ from console.anthropic.com, `pip install anthropic` in the backend venv, and set
 
 ## License
 
-TBD
+MIT
