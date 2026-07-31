@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routes import auth, chat
+from app.api.routes import auth, chat, workflow
 from app.db.session import Base, engine
 from app.models import message, user  # noqa: F401  (registers tables before create_all)
 
@@ -14,6 +14,7 @@ app = FastAPI(
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 
 
 @app.get("/health")
