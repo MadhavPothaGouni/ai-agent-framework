@@ -1,7 +1,10 @@
-"""FastAPI application entrypoint."""
 from fastapi import FastAPI
 
 from app.api.routes import auth, chat
+from app.db.session import Base, engine
+from app.models import user  # noqa: F401  (ensures the table is registered before create_all)
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="AI Agent Framework",

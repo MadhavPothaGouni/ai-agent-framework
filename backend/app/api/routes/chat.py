@@ -1,10 +1,8 @@
-"""Chat endpoint — routes a user message to the agent orchestrator.
-
-Phase 1 stub — returns an echo response. Wire this up to
-app.agents once the Planner/Coding agents exist.
-"""
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from app.core.security import get_current_user
+from app.models.user import User
 
 router = APIRouter()
 
@@ -20,6 +18,6 @@ class ChatResponse(BaseModel):
 
 
 @router.post("", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
+def chat(req: ChatRequest, current_user: User = Depends(get_current_user)) -> ChatResponse:
     # TODO(phase2): replace with agent orchestrator call
     return ChatResponse(reply=f"echo: {req.message}", session_id=req.session_id)
