@@ -5,7 +5,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db.session import Base, engine
+from app.db.session import Base, SessionLocal, engine
 from app.main import app
 
 
@@ -19,3 +19,13 @@ def _setup_db():
 @pytest.fixture()
 def client():
     return TestClient(app)
+
+
+@pytest.fixture()
+def db_session():
+    """A raw DB session for tests that talk to the memory/DB layer directly."""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()

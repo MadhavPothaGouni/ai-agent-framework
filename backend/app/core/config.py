@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
 
+    # "mock" (default, no API key needed) or "anthropic"
+    llm_provider: str = "mock"
+
     jwt_secret: str = "changeme"
     jwt_expire_minutes: int = 60
 
