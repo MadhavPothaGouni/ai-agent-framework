@@ -20,13 +20,19 @@ class AnthropicProvider(LLMProvider):
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     def complete(self, messages: list[dict[str, str]]) -> str:
-        response = self._client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1024,
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in messages
-                if m["role"] in ("user", "assistant")
-            ],
-        )
+        try:
+            response = self._client.messages.create(
+                model="claude-sonnet-5",
+                max_tokens=1536,
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in messages
+                    if m["role"] in ("user", "assistant")
+                ],
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Anthropic API call failed: {exc}. Check ANTHROPIC_API_KEY and network access."
+            ) from exc
+
         return response.content[0].text
