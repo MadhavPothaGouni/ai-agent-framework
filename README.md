@@ -1,21 +1,22 @@
 # AI Agent Framework
 
-A multi-agent developer platform: a system of cooperating agents (planner, coder,
-tester, reviewer) that plans a task, writes real code, runs real tests against it,
-and reports back — with persistent memory, real tool-calling (sandboxed filesystem +
-shell), a pluggable LLM provider (mock by default, real Claude on request), and full
-observability over past runs.
+A multi-agent developer platform with a full-stack UI: a system of cooperating
+agents (planner, coder, tester, reviewer) that plans a task, writes real code, runs
+real tests against it, and reports back — with persistent memory, real tool-calling
+(sandboxed filesystem + shell), a pluggable LLM provider (mock by default, real
+Claude on request), full observability over past runs, and a React dashboard to
+drive all of it.
 
 Author: Potha Gouni Madhav
 
 ## Why this project
 
 Most "AI agent" repos are thin wrappers around a single chat completion call. This
-one is built like a real backend service: JWT auth with hashed passwords, a
+one is built like a real product: a typed backend with JWT auth and a
 database-backed memory layer, a provider abstraction so the agents work identically
-whether they're calling a real LLM or a deterministic mock, and a workflow engine
-that chains agents together with a real retry/feedback loop instead of running them
-in isolation.
+whether they're calling a real LLM or a deterministic mock, a workflow engine that
+chains agents together with a real retry/feedback loop instead of running them in
+isolation, and a proper frontend instead of only a Swagger page.
 
 Everything below is actually implemented and covered by tests — nothing in this
 README describes planned-but-unbuilt behavior.
@@ -23,20 +24,26 @@ README describes planned-but-unbuilt behavior.
 ## Architecture
 
 ```
-User (JWT) -> API
-                |
-                +-- POST /chat --------> Planner Agent <---> persistent memory (SQLite)
-                |
-                +-- POST /workflow/run -> Planner -> Coder ---> writes solution.py
-                |                            ^          |       (FileSystemTool, sandboxed)
-                |                            |          v
-                |                     (retry loop)   Tester ---> runs real pytest
-                |                            |          |        (BashTool, sandboxed)
-                |                            +----------+
-                |                                       v
-                |                                   Reviewer -> approved / changes_requested
-                |                                       |
-                +-- GET /workflow/runs(/id) <---- WorkflowRun history (SQLite)
+Browser
+   |
+   v
+Frontend (React + TypeScript, Vite dev server :5173)
+   |  JWT bearer token, CORS
+   v
+API (FastAPI :8000)
+   |
+   +-- POST /chat --------> Planner Agent <---> persistent memory (SQLite)
+   |
+   +-- POST /workflow/run -> Planner -> Coder ---> writes solution.py
+   |                            ^          |       (FileSystemTool, sandboxed)
+   |                            |          v
+   |                     (retry loop)   Tester ---> runs real pytest
+   |                            |          |        (BashTool, sandboxed)
+   |                            +----------+
+   |                                       v
+   |                                   Reviewer -> approved / changes_requested
+   |                                       |
+   +-- GET /workflow/runs(/id) <---- WorkflowRun history (SQLite)
 ```
 
 The Coder and Tester aren't just generating text — they call real tools. The Coder
@@ -44,7 +51,8 @@ writes an actual `solution.py` to a per-run sandboxed workspace directory; the T
 writes a test file and actually executes `pytest` against it via subprocess, checking
 the real exit code. If the Tester rejects the code, the loop goes back to the Coder
 (with the failure reason attached) instead of failing outright, up to a configurable
-number of attempts.
+number of attempts. The frontend visualizes this whole pipeline live, including
+retry attempts.
 
 ## What's implemented
 
@@ -62,8 +70,12 @@ number of attempts.
   Claude-generated tests tailored to that code)
 - **Observability**: every workflow run is persisted (`GET /workflow/runs`,
   `GET /workflow/runs/{run_id}`), scoped per user
-- **38 automated tests** covering auth, memory, the orchestrator's retry logic,
-  the sandboxed tools, and the real-provider code path (via a fake injected
+- **Frontend**: a React/TypeScript dashboard — login/signup, a chat view with live
+  session memory, an animated Planner → Coder → Tester → Reviewer pipeline
+  visualization for workflow runs (with retry attempts grouped visually), and a
+  browsable run history panel with a detail view
+- **38 automated backend tests** covering auth, memory, the orchestrator's retry
+  logic, the sandboxed tools, and the real-provider code path (via a fake injected
   provider, so the test suite never needs a real API key)
 
 ## Tech stack
@@ -74,13 +86,15 @@ number of attempts.
 - LLM providers: a common `LLMProvider` interface; ships with Mock and Anthropic,
   designed to add OpenAI/Gemini/Ollama the same way
 - Testing: pytest, pytest-asyncio, FastAPI's `TestClient`
+- Frontend: React, TypeScript, Vite, Tailwind CSS, Framer Motion (animations),
+  React Router, Axios
 
 ## Project layout
 
 ```
 backend/
   app/
-    main.py                # FastAPI app entrypoint
+    main.py                # FastAPI app entrypoint, CORS
     core/
       config.py             # settings (.env-driven)
       security.py            # password hashing, JWT, auth dependency
@@ -105,9 +119,21 @@ backend/
   requirements.txt
   pytest.ini
 .env.example
+
+frontend/
+  src/
+    lib/          # API client (axios) + shared TypeScript types
+    context/      # AuthContext (JWT stored in localStorage)
+    components/   # Layout (nav + page transitions), AgentPipeline, ProtectedRoute
+    pages/        # LoginPage, SignupPage, ChatPage, WorkflowPage, RunHistoryPage
+  .env.example
 ```
 
 ## Getting started
+
+Run the backend and frontend in two separate terminals.
+
+**Backend:**
 
 ```bash
 cd backend
@@ -127,14 +153,23 @@ python -m pytest -q          # 38 passed
 uvicorn app.main:app --reload --reload-dir app
 ```
 
-Then open `http://127.0.0.1:8000/docs`, sign up, authorize with the token, and try
-`POST /workflow/run` with a task like `{"task": "build a calculator"}`.
+**Frontend:**
 
-By default this runs entirely on `LLM_PROVIDER=mock` — deterministic, free, and still
+```bash
+cd frontend
+npm install
+cp .env.example .env   # points at http://127.0.0.1:8000 by default
+npm run dev
+```
+
+Then open `http://localhost:5173`, sign up, and try the Chat and Workflow pages.
+(The API is also browsable directly at `http://127.0.0.1:8000/docs`.)
+
+By default everything runs on `LLM_PROVIDER=mock` — deterministic, free, and still
 exercises the full real pipeline (real files written, real pytest run). To see actual
-task-specific code generation, get an API key from console.anthropic.com,
-`pip install anthropic`, and set `ANTHROPIC_API_KEY` + `LLM_PROVIDER=anthropic` in
-`.env`.
+task-specific code generation and real conversational chat replies, get an API key
+from console.anthropic.com, `pip install anthropic` in the backend venv, and set
+`ANTHROPIC_API_KEY` + `LLM_PROVIDER=anthropic` in `backend/.env`.
 
 ## Roadmap
 
@@ -145,7 +180,10 @@ task-specific code generation, get an API key from console.anthropic.com,
       real retry feedback loop
 - [x] Phase 4: Real tool-calling (sandboxed filesystem + shell), workflow run
       history/observability, pluggable real LLM provider (Anthropic)
-- [ ] Phase 5: Distributed execution, plugin marketplace, workflow builder UI
+- [x] Frontend: React/TypeScript/Tailwind dashboard (auth, chat, animated
+      workflow pipeline, run history)
+- [ ] Phase 5: Distributed execution, plugin marketplace, drag-and-drop
+      workflow builder
 
 ## License
 
