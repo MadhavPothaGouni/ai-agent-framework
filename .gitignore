@@ -42,3 +42,5 @@ logs/
 .coverage
 .pytest_cache/
 htmlcov/
+
+agent_workspace/

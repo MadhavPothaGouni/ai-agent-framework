@@ -1,5 +1,8 @@
 from app.agents.base import AgentContext, AgentResult, BaseAgent
 from app.core.providers import get_provider
+from app.tools.filesystem import FileSystemTool
+
+SOLUTION_FILENAME = "solution.py"
 
 
 class CoderAgent(BaseAgent):
@@ -17,4 +20,13 @@ class CoderAgent(BaseAgent):
         code = provider.complete([{"role": "user", "content": prompt}])
         context.memory["code"] = code
 
-        return AgentResult(output=code, success=True, metadata={"provider": provider.name})
+        metadata: dict = {"provider": provider.name}
+
+        workspace_dir = context.memory.get("workspace_dir")
+        if workspace_dir:
+            fs = FileSystemTool(root=workspace_dir)
+            write_result = fs.run(action="write", path=SOLUTION_FILENAME, content=code)
+            metadata["file_written"] = write_result.success
+            metadata["file_path"] = f"{workspace_dir}/{SOLUTION_FILENAME}"
+
+        return AgentResult(output=code, success=True, metadata=metadata)

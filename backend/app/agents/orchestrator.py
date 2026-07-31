@@ -6,7 +6,9 @@ from app.agents.coder import CoderAgent
 from app.agents.planner import PlannerAgent
 from app.agents.reviewer import ReviewerAgent
 from app.agents.tester import TesterAgent
-
+from app.core.config import get_settings
+import uuid
+from pathlib import Path
 
 @dataclass
 class WorkflowStep:
@@ -33,6 +35,9 @@ class DevWorkflow:
 
     def run(self, task: str, history: list[dict[str, str]] | None = None) -> WorkflowResult:
         context = AgentContext(task=task, history=history or [{"role": "user", "content": task}])
+        run_id = uuid.uuid4().hex
+        workspace_dir = Path(get_settings().workspace_root) / run_id
+        context.memory["workspace_dir"] = str(workspace_dir)
         steps: list[WorkflowStep] = []
 
         plan_result = self.planner.run(context)
