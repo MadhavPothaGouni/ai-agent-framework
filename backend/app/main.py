@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from app.api.routes import auth, chat, workflow
 from app.db.session import Base, engine
-from app.models import message, user  # noqa: F401  (registers tables before create_all)
+from app.models import message, user, workflow_run  # noqa: F401  (registers tables before create_all)
 
 Base.metadata.create_all(bind=engine)
 

@@ -20,6 +20,7 @@ class WorkflowStep:
 
 @dataclass
 class WorkflowResult:
+    run_id: str
     steps: list[WorkflowStep]
     final_decision: str
     attempts: int
@@ -64,6 +65,7 @@ class DevWorkflow:
         steps.append(WorkflowStep("reviewer", review_result.output, review_result.success, review_result.metadata))
 
         return WorkflowResult(
+            run_id=run_id,
             steps=steps,
             final_decision=context.memory.get("review_decision", "unknown"),
             attempts=attempt,
