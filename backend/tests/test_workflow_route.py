@@ -20,10 +20,10 @@ def test_workflow_run_with_token_returns_full_trace(client):
 
     body = resp.json()
     agent_order = [s["agent"] for s in body["steps"]]
-    assert agent_order == ["planner", "coder", "tester", "reviewer"]
+    assert agent_order == ["planner", "coder", "tester", "security_auditor", "reviewer"]
     assert body["final_decision"] == "approved"
     assert body["attempts"] == 1
-    assert body["run_id"]
+    assert body["run_id"]  # non-empty
 
 
 def test_workflow_runs_list_without_token_rejected(client):

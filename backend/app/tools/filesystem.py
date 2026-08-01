@@ -1,8 +1,11 @@
+
 from pathlib import Path
 
 from app.tools.base import BaseTool, ToolResult
+from app.tools.registry import register_tool
 
 
+@register_tool
 class FileSystemTool(BaseTool):
     name = "filesystem"
     description = "Read, write, and list files inside a sandboxed workspace directory."
@@ -17,7 +20,7 @@ class FileSystemTool(BaseTool):
             raise ValueError(f"Path '{relative_path}' escapes the sandboxed workspace")
         return target
 
-    def run(self, action: str, path: str = "", content: str = "") -> ToolResult:
+    def run(self, action: str, path: str = "", content: str = "") -> ToolResult:  # type: ignore[override]
         try:
             if action == "write":
                 target = self._resolve(path)
@@ -35,5 +38,5 @@ class FileSystemTool(BaseTool):
                 return ToolResult(output="\n".join(names))
 
             return ToolResult(output="", success=False, error=f"Unknown action: {action}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — surface any failure as a ToolResult, don't crash the agent
             return ToolResult(output="", success=False, error=str(exc))

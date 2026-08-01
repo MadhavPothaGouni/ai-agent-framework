@@ -17,11 +17,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
+
+    # "mock" (default, no API key needed), "anthropic", "openai", or "gemini"
+    llm_provider: str = "mock"
+
     # Each workflow run gets its own subfolder here (see app/agents/orchestrator.py)
     workspace_root: str = "./agent_workspace"
-
-    # "mock" (default, no API key needed) or "anthropic"
-    llm_provider: str = "mock"
 
     jwt_secret: str = "changeme"
     jwt_expire_minutes: int = 60

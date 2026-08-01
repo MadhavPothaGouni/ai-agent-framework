@@ -1,14 +1,16 @@
+
 from collections.abc import Callable
 
 from app.agents.base import AgentContext, AgentResult, BaseAgent
 from app.agents.code_extraction import extract_code_block
 from app.core.providers import get_provider
 from app.core.providers.base import LLMProvider
-from app.tools.bash import BashTool
-from app.tools.filesystem import FileSystemTool
+from app.tools import get_registry
 
 TEST_FILENAME = "test_solution.py"
 
+# Matches the shape of MockProvider's fixed solution.py (a `solution(a, b)`
+# function). Only used when the configured provider is "mock".
 _DEMO_TEST_FILE = """from solution import solution
 
 
@@ -18,10 +20,13 @@ def test_solution_adds_numbers():
 
 
 def _placeholder_check(code: str) -> bool:
+    """Used only when no workspace is configured at all (no sandbox to run in)."""
     return bool(code) and "TODO" not in code
 
 
 def _build_test_file(provider: LLMProvider, task: str, code: str) -> str:
+    """Ask the provider to write pytest tests for code it doesn't control the
+    shape of (a real task can produce any function/class names)."""
     prompt = (
         "You are a QA agent. Below is a Python implementation written for this task:\n"
         f"Task: {task}\n\n"
@@ -37,7 +42,7 @@ def _build_test_file(provider: LLMProvider, task: str, code: str) -> str:
 
 class TesterAgent(BaseAgent):
     name = "tester"
-    __test__ = False
+    __test__ = False  # tell pytest this isn't a test class despite the name
 
     def __init__(
         self,
@@ -68,11 +73,12 @@ class TesterAgent(BaseAgent):
             _DEMO_TEST_FILE if provider.name == "mock" else _build_test_file(provider, context.task, code)
         )
 
-        fs = FileSystemTool(root=workspace_dir)
+        registry = get_registry()
+        fs = registry.create("filesystem", root=workspace_dir)
         fs.run(action="write", path="solution.py", content=code)
         fs.run(action="write", path=TEST_FILENAME, content=test_file_content)
 
-        bash = BashTool(cwd=workspace_dir)
+        bash = registry.create("bash", cwd=workspace_dir)
         result = bash.run(f"python -m pytest {TEST_FILENAME} -q")
 
         context.memory["test_passed"] = result.success
