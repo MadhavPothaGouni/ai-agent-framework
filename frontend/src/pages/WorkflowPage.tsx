@@ -1,16 +1,15 @@
+/**
+ * WorkflowPage — runs a DevWorkflow task and streams each agent step live
+ * over a WebSocket into the existing <AgentPipeline /> component, instead of
+ * blocking on a single POST /workflow/run call until the whole pipeline
+ * finishes. Reuses AgentPipeline so styling matches Run History exactly.
+ */
+import { useState } from "react";
+import { AgentPipeline } from "../components/AgentPipeline";
+import type { AgentName, WorkflowStep } from "../lib/types";
 
-import { useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-
-const TOKEN_KEY = "token";
+const TOKEN_KEY = "agent_framework_token";
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
-
-type StepMessage = {
-  type: "step";
-  agent: string;
-  output: string;
-  success: boolean;
-};
 
 type DoneMessage = {
   type: "done";
@@ -24,18 +23,16 @@ type ErrorMessage = {
   message: string;
 };
 
-type ServerMessage = StepMessage | DoneMessage | ErrorMessage;
+type StepEventMessage = {
+  type: "step";
+  agent: AgentName;
+  output: string;
+  success: boolean;
+};
+
+type ServerMessage = StepEventMessage | DoneMessage | ErrorMessage;
 
 type Status = "idle" | "connecting" | "running" | "done" | "error";
-
-const AGENT_LABELS: Record<string, string> = {
-  planner: "Planner",
-  coder: "Coder",
-  tester: "Tester",
-  debugger: "Debugger",
-  security_auditor: "Security Auditor",
-  reviewer: "Reviewer",
-};
 
 function wsUrlFor(path: string): string {
   const url = new URL(path, API_BASE_URL);
@@ -43,13 +40,13 @@ function wsUrlFor(path: string): string {
   return url.toString();
 }
 
-export default function WorkflowPage() {
+export function WorkflowPage() {
   const [task, setTask] = useState("");
   const [status, setStatus] = useState<Status>("idle");
-  const [steps, setSteps] = useState<StepMessage[]>([]);
-  const [result, setResult] = useState<DoneMessage | null>(null);
+  const [steps, setSteps] = useState<WorkflowStep[]>([]);
+  const [finalDecision, setFinalDecision] = useState("");
+  const [attempts, setAttempts] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
 
   const runWorkflow = () => {
     if (!task.trim() || status === "connecting" || status === "running") return;
@@ -62,12 +59,12 @@ export default function WorkflowPage() {
     }
 
     setSteps([]);
-    setResult(null);
+    setFinalDecision("");
+    setAttempts(0);
     setErrorMessage(null);
     setStatus("connecting");
 
     const socket = new WebSocket(wsUrlFor(`/workflow/ws/run?token=${encodeURIComponent(token)}`));
-    socketRef.current = socket;
 
     socket.onopen = () => {
       setStatus("running");
@@ -78,9 +75,10 @@ export default function WorkflowPage() {
       const msg = JSON.parse(event.data) as ServerMessage;
 
       if (msg.type === "step") {
-        setSteps((prev) => [...prev, msg]);
+        setSteps((prev) => [...prev, { agent: msg.agent, output: msg.output, success: msg.success }]);
       } else if (msg.type === "done") {
-        setResult(msg);
+        setFinalDecision(msg.final_decision);
+        setAttempts(msg.attempts);
         setStatus("done");
       } else if (msg.type === "error") {
         setErrorMessage(msg.message);
@@ -101,10 +99,10 @@ export default function WorkflowPage() {
   const isBusy = status === "connecting" || status === "running";
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Run a workflow</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-white">Run a workflow</h1>
+        <p className="mt-1 text-sm text-white/40">
           Watch each agent — Planner, Coder, Tester, Debugger, Security Auditor, Reviewer — complete live.
         </p>
       </div>
@@ -116,81 +114,32 @@ export default function WorkflowPage() {
           onKeyDown={(e) => e.key === "Enter" && runWorkflow()}
           disabled={isBusy}
           placeholder="e.g. write a function that reverses a string"
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-gray-500 focus:outline-none disabled:bg-gray-100"
+          className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-white/30 disabled:opacity-50"
         />
         <button
           onClick={runWorkflow}
           disabled={isBusy || !task.trim()}
-          className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-xl bg-[#7c5cff] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#6c4ce6] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isBusy ? "Running…" : "Run"}
         </button>
       </div>
 
       {status === "error" && errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           {errorMessage}
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <AnimatePresence initial={false}>
-          {steps.map((step, i) => (
-            <motion.div
-              key={`${step.agent}-${i}`}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className={`rounded-lg border px-4 py-3 shadow-sm ${
-                step.success ? "border-gray-200 bg-white" : "border-amber-200 bg-amber-50"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-900">
-                  {AGENT_LABELS[step.agent] ?? step.agent}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    step.success ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                  }`}
-                >
-                  {step.success ? "OK" : "flagged"}
-                </span>
-              </div>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-gray-600">
-                {step.output}
-              </pre>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+      {steps.length > 0 && (
+        <AgentPipeline steps={steps} finalDecision={finalDecision} attempts={attempts} />
+      )}
 
-        {status === "connecting" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-400"
-          >
-            Connecting…
-          </motion.div>
-        )}
-      </div>
-
-      <AnimatePresence>
-        {result && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`rounded-lg border px-4 py-4 text-sm font-medium ${
-              result.final_decision === "approved"
-                ? "border-green-200 bg-green-50 text-green-800"
-                : "border-amber-200 bg-amber-50 text-amber-800"
-            }`}
-          >
-            Final decision: {result.final_decision} · {result.attempts} attempt
-            {result.attempts === 1 ? "" : "s"} · run {result.run_id.slice(0, 8)}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {status === "connecting" && (
+        <div className="rounded-xl border border-dashed border-[var(--color-border)] px-4 py-3 text-sm text-white/30">
+          Connecting…
+        </div>
+      )}
     </div>
   );
 }

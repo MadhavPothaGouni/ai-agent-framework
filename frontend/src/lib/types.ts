@@ -8,7 +8,7 @@ export interface ChatResponse {
   session_id: string
 }
 
-export type AgentName = "planner" | "coder" | "tester" | "reviewer"
+export type AgentName = "planner" | "coder" | "tester" | "debugger" | "security_auditor" | "reviewer";
 
 export interface WorkflowStep {
   agent: AgentName

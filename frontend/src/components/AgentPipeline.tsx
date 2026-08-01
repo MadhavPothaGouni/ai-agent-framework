@@ -6,6 +6,8 @@ const AGENT_META: Record<AgentName, { label: string; color: string; icon: string
   planner: { label: "Planner", color: "#7c5cff", icon: "◈" },
   coder: { label: "Coder", color: "#38bdf8", icon: "◇" },
   tester: { label: "Tester", color: "#f59e0b", icon: "◆" },
+  debugger: { label: "Debugger", color: "#f43f5e", icon: "◐" },
+  security_auditor: { label: "Security Auditor", color: "#14b8a6", icon: "◎" },
   reviewer: { label: "Reviewer", color: "#22c55e", icon: "◉" },
 }
 
@@ -53,34 +55,36 @@ export function AgentPipeline({
         </motion.div>
       ))}
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: steps.length * 0.08 + 0.1, duration: 0.3 }}
-        className={`mt-2 flex items-center justify-between rounded-2xl border px-5 py-4 ${
-          approved
-            ? "border-[var(--color-success)]/30 bg-[var(--color-success)]/10"
-            : "border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10"
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <span
-            className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
-              approved ? "bg-[var(--color-success)]/20" : "bg-[var(--color-danger)]/20"
-            }`}
-          >
-            {approved ? "✓" : "✕"}
-          </span>
-          <div>
-            <div className="text-sm font-semibold text-white">
-              {approved ? "Approved" : "Changes requested"}
-            </div>
-            <div className="text-xs text-white/40">
-              {attempts} attempt{attempts === 1 ? "" : "s"}
+      {finalDecision && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: steps.length * 0.08 + 0.1, duration: 0.3 }}
+          className={`mt-2 flex items-center justify-between rounded-2xl border px-5 py-4 ${
+            approved
+              ? "border-[var(--color-success)]/30 bg-[var(--color-success)]/10"
+              : "border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
+                approved ? "bg-[var(--color-success)]/20" : "bg-[var(--color-danger)]/20"
+              }`}
+            >
+              {approved ? "✓" : "✕"}
+            </span>
+            <div>
+              <div className="text-sm font-semibold text-white">
+                {approved ? "Approved" : "Changes requested"}
+              </div>
+              <div className="text-xs text-white/40">
+                {attempts} attempt{attempts === 1 ? "" : "s"}
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </div>
   )
 }
