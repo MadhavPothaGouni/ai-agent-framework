@@ -8,6 +8,7 @@ const AGENT_META: Record<AgentName, { label: string; color: string; icon: string
   tester: { label: "Tester", color: "#f59e0b", icon: "◆" },
   debugger: { label: "Debugger", color: "#f43f5e", icon: "◐" },
   security_auditor: { label: "Security Auditor", color: "#14b8a6", icon: "◎" },
+  human_review: { label: "Human Review", color: "#6366f1", icon: "◑" },
   reviewer: { label: "Reviewer", color: "#22c55e", icon: "◉" },
 }
 

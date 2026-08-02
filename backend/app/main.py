@@ -1,13 +1,12 @@
-"""FastAPI application entrypoint."""
 import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, chat, workflow, workflow_ws
+from app.api.routes import auth, budget, chat, workflow, workflow_approvals, workflow_ws
 from app.core.logging import configure_logging, get_logger
 from app.db.session import Base, engine
-from app.models import message, user, workflow_run  # noqa: F401  (registers tables before create_all)
+from app.models import approval, budget as budget_model, message, usage, user, workflow_run  # noqa: F401  (registers tables before create_all)
 
 configure_logging()
 logger = get_logger("http")
@@ -61,6 +60,8 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 app.include_router(workflow_ws.router, prefix="/workflow", tags=["workflow"])
+app.include_router(workflow_approvals.router, prefix="/workflow", tags=["workflow"])
+app.include_router(budget.router, prefix="/budget", tags=["budget"])
 
 
 @app.get("/health")

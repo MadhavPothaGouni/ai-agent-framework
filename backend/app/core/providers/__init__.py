@@ -1,10 +1,4 @@
-"""Provider factory — returns whichever LLMProvider is configured.
 
-LLM_PROVIDER=mock (default), anthropic, openai, or gemini. Each real
-provider is imported lazily so the base project has no hard dependency
-on any particular SDK — only the one you actually select needs to be
-installed.
-"""
 from app.core.config import get_settings
 from app.core.providers.base import LLMProvider
 from app.core.providers.mock import MockProvider
@@ -37,3 +31,10 @@ def get_provider() -> LLMProvider:
         return GeminiProvider()
 
     return MockProvider()
+
+
+def get_metered_provider() -> LLMProvider:
+  
+    from app.core.cost_tracker import MeteredProvider
+
+    return MeteredProvider(get_provider())

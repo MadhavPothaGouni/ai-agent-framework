@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from app.agents.base import AgentContext, AgentResult, BaseAgent
 from app.agents.code_extraction import extract_code_block
-from app.core.providers import get_provider
+from app.core.providers import get_metered_provider
 from app.core.providers.base import LLMProvider
 from app.tools import get_registry
 
@@ -68,7 +68,7 @@ class TesterAgent(BaseAgent):
             summary = "All checks passed." if passed else "Checks failed: code did not meet requirements."
             return AgentResult(output=summary, success=passed, metadata={"passed": passed})
 
-        provider = self._provider or get_provider()
+        provider = self._provider or get_metered_provider()
         test_file_content = (
             _DEMO_TEST_FILE if provider.name == "mock" else _build_test_file(provider, context.task, code)
         )

@@ -1,14 +1,21 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agents import run_store
+from app.agents.budget import make_budget_checker
 from app.agents.orchestrator import DevWorkflow
+from app.core.rate_limit import user_rate_limited
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 
 router = APIRouter()
+
+# Real subprocess + (optionally) real LLM calls happen here, so this gets
+# a tighter budget than the read-only /runs endpoints below.
+_workflow_run_rate_limit = user_rate_limited(max_requests=10, window_seconds=60)
 
 
 class WorkflowRequest(BaseModel):
@@ -26,6 +33,8 @@ class WorkflowResponse(BaseModel):
     steps: list[WorkflowStepResponse]
     final_decision: str
     attempts: int
+    total_cost_usd: float = 0.0
+    total_tokens: int = 0
 
 
 class WorkflowRunSummary(BaseModel):
@@ -33,6 +42,8 @@ class WorkflowRunSummary(BaseModel):
     task: str
     final_decision: str
     attempts: int
+    total_cost_usd: float = 0.0
+    total_tokens: int = 0
     created_at: str
 
 
@@ -43,10 +54,11 @@ class WorkflowRunDetail(WorkflowRunSummary):
 @router.post("/run", response_model=WorkflowResponse)
 def run_workflow(
     req: WorkflowRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_workflow_run_rate_limit),
     db: Session = Depends(get_db),
 ) -> WorkflowResponse:
-    result = DevWorkflow().run(req.task)
+    budget_checker = make_budget_checker(db, current_user.id)
+    result = DevWorkflow().run(req.task, check_budget_exceeded=budget_checker)
     run_store.save_run(db, current_user.id, req.task, result)
 
     return WorkflowResponse(
@@ -57,6 +69,8 @@ def run_workflow(
         ],
         final_decision=result.final_decision,
         attempts=result.attempts,
+        total_cost_usd=result.total_cost_usd,
+        total_tokens=result.total_tokens,
     )
 
 
@@ -72,6 +86,8 @@ def list_workflow_runs(
             task=r.task,
             final_decision=r.final_decision,
             attempts=r.attempts,
+            total_cost_usd=r.total_cost_usd,
+            total_tokens=r.total_tokens,
             created_at=r.created_at.isoformat(),
         )
         for r in runs
@@ -93,6 +109,8 @@ def get_workflow_run(
         task=run.task,
         final_decision=run.final_decision,
         attempts=run.attempts,
+        total_cost_usd=run.total_cost_usd,
+        total_tokens=run.total_tokens,
         created_at=run.created_at.isoformat(),
         steps=[
             WorkflowStepResponse(agent=s.agent, output=s.output, success=s.success)

@@ -1,6 +1,6 @@
 
 from app.agents.base import AgentContext, AgentResult, BaseAgent
-from app.core.providers import get_provider
+from app.core.providers import get_metered_provider
 from app.core.providers.base import LLMProvider
 
 # Ordered roughly by how commonly they show up in a first-attempt LLM
@@ -49,7 +49,7 @@ class DebuggerAgent(BaseAgent):
         self._provider = provider
 
     def run(self, context: AgentContext) -> AgentResult:
-        provider = self._provider or get_provider()
+        provider = self._provider or get_metered_provider()
         code = context.memory.get("code", "")
         failure_output = context.memory.get("last_test_output", "")
 

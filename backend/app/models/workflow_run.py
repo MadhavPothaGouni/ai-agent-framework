@@ -1,6 +1,7 @@
+
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -15,6 +16,8 @@ class WorkflowRun(Base):
     task: Mapped[str] = mapped_column(Text, nullable=False)
     final_decision: Mapped[str] = mapped_column(String, nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0")
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), index=True
     )

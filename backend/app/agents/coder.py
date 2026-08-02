@@ -1,7 +1,7 @@
 
 from app.agents.base import AgentContext, AgentResult, BaseAgent
 from app.agents.code_extraction import extract_code_block
-from app.core.providers import get_provider
+from app.core.providers import get_metered_provider
 from app.core.providers.base import LLMProvider
 from app.tools import get_registry
 
@@ -17,7 +17,7 @@ class CoderAgent(BaseAgent):
         self._provider = provider
 
     def run(self, context: AgentContext) -> AgentResult:
-        provider = self._provider or get_provider()
+        provider = self._provider or get_metered_provider()
         plan = context.memory.get("plan", context.task)
         previous_failure = context.memory.get("previous_failure")
 

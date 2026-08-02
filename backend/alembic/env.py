@@ -8,7 +8,7 @@ from sqlalchemy import engine_from_config, pool
 # Base.metadata) before Alembic inspects it for autogenerate — mirrors
 # the same import list app/main.py uses before create_all().
 from app.db.session import Base, engine
-from app.models import message, user, workflow_run  # noqa: F401
+from app.models import approval, budget, message, usage, user, workflow_run  # noqa: F401
 
 config = context.config
 
