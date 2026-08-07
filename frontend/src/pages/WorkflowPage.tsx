@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AgentPipeline } from "../components/AgentPipeline";
 import type { AgentName, WorkflowStep } from "../lib/types";
 
@@ -11,6 +10,8 @@ type DoneMessage = {
   run_id: string;
   final_decision: string;
   attempts: number;
+  total_cost_usd: number;
+  total_tokens: number;
 };
 
 type ErrorMessage = {
@@ -41,10 +42,21 @@ type PendingApproval = {
   code: string;
 };
 
+type BudgetStatus = {
+  monthly_cap_usd: number;
+  spent_this_month_usd: number;
+  remaining_usd: number;
+  exceeded: boolean;
+};
+
 function wsUrlFor(path: string): string {
   const url = new URL(path, API_BASE_URL);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
+}
+
+function formatUsd(amount: number): string {
+  return `$${amount.toFixed(amount < 1 ? 4 : 2)}`;
 }
 
 export function WorkflowPage() {
@@ -57,11 +69,34 @@ export function WorkflowPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [budgetStatus, setBudgetStatus] = useState<BudgetStatus | null>(null);
 
   const isBusy = status === "connecting" || status === "running";
+  const budgetExceeded = budgetStatus?.exceeded ?? false;
+
+  const fetchBudgetStatus = async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const res = await fetch(new URL("/budget/status", API_BASE_URL), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as BudgetStatus;
+      setBudgetStatus(data);
+    } catch {
+      // Budget widget is a nice-to-have — a failed fetch shouldn't block
+      // the rest of the page from working.
+    }
+  };
+
+  useEffect(() => {
+    fetchBudgetStatus();
+  }, []);
 
   const runWorkflow = () => {
-    if (!task.trim() || isBusy) return;
+    if (!task.trim() || isBusy || budgetExceeded) return;
 
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
@@ -96,6 +131,7 @@ export function WorkflowPage() {
         setFinalDecision(msg.final_decision);
         setAttempts(msg.attempts);
         setStatus("done");
+        fetchBudgetStatus(); // refresh spend now that this run's usage is persisted
       } else if (msg.type === "error") {
         setErrorMessage(msg.message);
         setStatus("error");
@@ -126,11 +162,30 @@ export function WorkflowPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Run a workflow</h1>
-        <p className="mt-1 text-sm text-white/40">
-          Watch each agent — Planner, Coder, Tester, Debugger, Security Auditor, Reviewer — complete live.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Run a workflow</h1>
+          <p className="mt-1 text-sm text-white/40">
+            Watch each agent — Planner, Coder, Tester, Debugger, Security Auditor, Reviewer — complete live.
+          </p>
+        </div>
+
+        {budgetStatus && (
+          <div
+            className={`shrink-0 rounded-xl border px-4 py-2.5 text-right text-xs ${
+              budgetStatus.exceeded
+                ? "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--color-danger)]"
+                : "border-[var(--color-border)] bg-[var(--color-surface)] text-white/50"
+            }`}
+          >
+            <div className="font-medium">
+              {formatUsd(budgetStatus.spent_this_month_usd)} / {formatUsd(budgetStatus.monthly_cap_usd)} this month
+            </div>
+            <div className="mt-0.5">
+              {budgetStatus.exceeded ? "Monthly budget cap reached" : `${formatUsd(budgetStatus.remaining_usd)} remaining`}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-3">
@@ -145,7 +200,8 @@ export function WorkflowPage() {
           />
           <button
             onClick={runWorkflow}
-            disabled={isBusy || !task.trim()}
+            disabled={isBusy || !task.trim() || budgetExceeded}
+            title={budgetExceeded ? "Monthly budget cap reached — raise your limit to keep running workflows." : undefined}
             className="rounded-xl bg-[#7c5cff] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#6c4ce6] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isBusy ? "Running…" : "Run"}
@@ -163,6 +219,13 @@ export function WorkflowPage() {
           Require my approval before the Tester executes any generated code
         </label>
       </div>
+
+      {budgetExceeded && (
+        <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
+          You've reached your monthly budget cap ({formatUsd(budgetStatus!.monthly_cap_usd)}) — new workflow runs
+          are blocked until next month, or until you raise your limit.
+        </div>
+      )}
 
       {status === "error" && errorMessage && (
         <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
